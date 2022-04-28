@@ -1,0 +1,3203 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/Santosh3010/Advance-AI-Project/blob/main/AAI_Evaluation%20of%20each%20category\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 4,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "LR7RK-ejVF9D",
+        "outputId": "725b8383-bce5-451f-af2d-0ab7e1745c75"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "[nltk_data] Downloading package stopwords to /root/nltk_data...\n",
+            "[nltk_data]   Package stopwords is already up-to-date!\n",
+            "[nltk_data] Downloading package punkt to /root/nltk_data...\n",
+            "[nltk_data]   Package punkt is already up-to-date!\n"
+          ]
+        }
+      ],
+      "source": [
+        "#import the libraries\n",
+        "import pandas as pd\n",
+        "import numpy as np\n",
+        "import matplotlib.pyplot as plt\n",
+        "import seaborn as sns\n",
+        "import re\n",
+        "import nltk\n",
+        "nltk.download('stopwords')\n",
+        "nltk.download('punkt')\n",
+        "from nltk.corpus import stopwords\n",
+        "from nltk.stem.porter import PorterStemmer\n",
+        "from sklearn.utils import resample\n",
+        "import string\n",
+        "#sklearn package \n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.feature_extraction.text import TfidfVectorizer\n",
+        "from sklearn. preprocessing import LabelEncoder,StandardScaler\n",
+        "import sklearn.feature_selection\n",
+        "\n",
+        "from sklearn.decomposition import TruncatedSVD\n",
+        "from sklearn.pipeline import Pipeline\n",
+        "from sklearn.naive_bayes import ComplementNB,MultinomialNB,GaussianNB \n",
+        "\n",
+        "from sklearn.model_selection import cross_val_score\n",
+        "from sklearn.model_selection import RepeatedStratifiedKFold\n",
+        "from sklearn.svm import SVC\n",
+        "from sklearn.linear_model import LogisticRegression\n",
+        "from sklearn.model_selection import GridSearchCV\n",
+        "\n",
+        "from sklearn.ensemble import GradientBoostingClassifier\n",
+        "\n",
+        "#model evaluation\n",
+        "from sklearn.metrics import accuracy_score,classification_report, confusion_matrix,recall_score,precision_score,f1_score\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 5,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "nLSGnmukfZyf",
+        "outputId": "cffd0278-cc9d-445a-95cc-5ab2d5d460e4"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "Index(['category', 'headline', 'authors', 'link', 'short_description', 'date'], dtype='object')"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 5
+        }
+      ],
+      "source": [
+        "#read the dataset\n",
+        "data = pd.read_json('News_Category_Dataset_v2.json',lines=True) # lines for avoid the trailing error\n",
+        "column = data.columns\n",
+        "column"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "_fW5OkvVf7DS"
+      },
+      "source": [
+        "## Data Inspection\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 6,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 337
+        },
+        "id": "-tmpTBPxf3yP",
+        "outputId": "181e169c-dbf8-4167-b777-eae78eb76088"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "        category                                           headline  \\\n",
+              "0          CRIME  There Were 2 Mass Shootings In Texas Last Week...   \n",
+              "1  ENTERTAINMENT  Will Smith Joins Diplo And Nicky Jam For The 2...   \n",
+              "2  ENTERTAINMENT    Hugh Grant Marries For The First Time At Age 57   \n",
+              "3  ENTERTAINMENT  Jim Carrey Blasts 'Castrato' Adam Schiff And D...   \n",
+              "4  ENTERTAINMENT  Julianna Margulies Uses Donald Trump Poop Bags...   \n",
+              "\n",
+              "           authors                                               link  \\\n",
+              "0  Melissa Jeltsen  https://www.huffingtonpost.com/entry/texas-ama...   \n",
+              "1    Andy McDonald  https://www.huffingtonpost.com/entry/will-smit...   \n",
+              "2       Ron Dicker  https://www.huffingtonpost.com/entry/hugh-gran...   \n",
+              "3       Ron Dicker  https://www.huffingtonpost.com/entry/jim-carre...   \n",
+              "4       Ron Dicker  https://www.huffingtonpost.com/entry/julianna-...   \n",
+              "\n",
+              "                                   short_description       date  \n",
+              "0  She left her husband. He killed their children... 2018-05-26  \n",
+              "1                           Of course it has a song. 2018-05-26  \n",
+              "2  The actor and his longtime girlfriend Anna Ebe... 2018-05-26  \n",
+              "3  The actor gives Dems an ass-kicking for not fi... 2018-05-26  \n",
+              "4  The \"Dietland\" actress said using the bags is ... 2018-05-26  "
+            ],
+            "text/html": [
+              "\n",
+              "  <div id=\"df-259a7a07-3a0e-425b-af8b-079856ec1ab1\">\n",
+              "    <div class=\"colab-df-container\">\n",
+              "      <div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>category</th>\n",
+              "      <th>headline</th>\n",
+              "      <th>authors</th>\n",
+              "      <th>link</th>\n",
+              "      <th>short_description</th>\n",
+              "      <th>date</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>0</th>\n",
+              "      <td>CRIME</td>\n",
+              "      <td>There Were 2 Mass Shootings In Texas Last Week...</td>\n",
+              "      <td>Melissa Jeltsen</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/texas-ama...</td>\n",
+              "      <td>She left her husband. He killed their children...</td>\n",
+              "      <td>2018-05-26</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>1</th>\n",
+              "      <td>ENTERTAINMENT</td>\n",
+              "      <td>Will Smith Joins Diplo And Nicky Jam For The 2...</td>\n",
+              "      <td>Andy McDonald</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/will-smit...</td>\n",
+              "      <td>Of course it has a song.</td>\n",
+              "      <td>2018-05-26</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>2</th>\n",
+              "      <td>ENTERTAINMENT</td>\n",
+              "      <td>Hugh Grant Marries For The First Time At Age 57</td>\n",
+              "      <td>Ron Dicker</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/hugh-gran...</td>\n",
+              "      <td>The actor and his longtime girlfriend Anna Ebe...</td>\n",
+              "      <td>2018-05-26</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>3</th>\n",
+              "      <td>ENTERTAINMENT</td>\n",
+              "      <td>Jim Carrey Blasts 'Castrato' Adam Schiff And D...</td>\n",
+              "      <td>Ron Dicker</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/jim-carre...</td>\n",
+              "      <td>The actor gives Dems an ass-kicking for not fi...</td>\n",
+              "      <td>2018-05-26</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>4</th>\n",
+              "      <td>ENTERTAINMENT</td>\n",
+              "      <td>Julianna Margulies Uses Donald Trump Poop Bags...</td>\n",
+              "      <td>Ron Dicker</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/julianna-...</td>\n",
+              "      <td>The \"Dietland\" actress said using the bags is ...</td>\n",
+              "      <td>2018-05-26</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>\n",
+              "      <button class=\"colab-df-convert\" onclick=\"convertToInteractive('df-259a7a07-3a0e-425b-af8b-079856ec1ab1')\"\n",
+              "              title=\"Convert this dataframe to an interactive table.\"\n",
+              "              style=\"display:none;\">\n",
+              "        \n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\"viewBox=\"0 0 24 24\"\n",
+              "       width=\"24px\">\n",
+              "    <path d=\"M0 0h24v24H0V0z\" fill=\"none\"/>\n",
+              "    <path d=\"M18.56 5.44l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94zm-11 1L8.5 8.5l.94-2.06 2.06-.94-2.06-.94L8.5 2.5l-.94 2.06-2.06.94zm10 10l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94z\"/><path d=\"M17.41 7.96l-1.37-1.37c-.4-.4-.92-.59-1.43-.59-.52 0-1.04.2-1.43.59L10.3 9.45l-7.72 7.72c-.78.78-.78 2.05 0 2.83L4 21.41c.39.39.9.59 1.41.59.51 0 1.02-.2 1.41-.59l7.78-7.78 2.81-2.81c.8-.78.8-2.07 0-2.86zM5.41 20L4 18.59l7.72-7.72 1.47 1.35L5.41 20z\"/>\n",
+              "  </svg>\n",
+              "      </button>\n",
+              "      \n",
+              "  <style>\n",
+              "    .colab-df-container {\n",
+              "      display:flex;\n",
+              "      flex-wrap:wrap;\n",
+              "      gap: 12px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert {\n",
+              "      background-color: #E8F0FE;\n",
+              "      border: none;\n",
+              "      border-radius: 50%;\n",
+              "      cursor: pointer;\n",
+              "      display: none;\n",
+              "      fill: #1967D2;\n",
+              "      height: 32px;\n",
+              "      padding: 0 0 0 0;\n",
+              "      width: 32px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert:hover {\n",
+              "      background-color: #E2EBFA;\n",
+              "      box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "      fill: #174EA6;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert {\n",
+              "      background-color: #3B4455;\n",
+              "      fill: #D2E3FC;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert:hover {\n",
+              "      background-color: #434B5C;\n",
+              "      box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "      filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "      fill: #FFFFFF;\n",
+              "    }\n",
+              "  </style>\n",
+              "\n",
+              "      <script>\n",
+              "        const buttonEl =\n",
+              "          document.querySelector('#df-259a7a07-3a0e-425b-af8b-079856ec1ab1 button.colab-df-convert');\n",
+              "        buttonEl.style.display =\n",
+              "          google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "        async function convertToInteractive(key) {\n",
+              "          const element = document.querySelector('#df-259a7a07-3a0e-425b-af8b-079856ec1ab1');\n",
+              "          const dataTable =\n",
+              "            await google.colab.kernel.invokeFunction('convertToInteractive',\n",
+              "                                                     [key], {});\n",
+              "          if (!dataTable) return;\n",
+              "\n",
+              "          const docLinkHtml = 'Like what you see? Visit the ' +\n",
+              "            '<a target=\"_blank\" href=https://colab.research.google.com/notebooks/data_table.ipynb>data table notebook</a>'\n",
+              "            + ' to learn more about interactive tables.';\n",
+              "          element.innerHTML = '';\n",
+              "          dataTable['output_type'] = 'display_data';\n",
+              "          await google.colab.output.renderOutput(dataTable, element);\n",
+              "          const docLink = document.createElement('div');\n",
+              "          docLink.innerHTML = docLinkHtml;\n",
+              "          element.appendChild(docLink);\n",
+              "        }\n",
+              "      </script>\n",
+              "    </div>\n",
+              "  </div>\n",
+              "  "
+            ]
+          },
+          "metadata": {},
+          "execution_count": 6
+        }
+      ],
+      "source": [
+        "data.head(5)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 7,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "vxDwq5qaf-kt",
+        "outputId": "d17ce5aa-f2e7-4422-90bc-fa995f8363b9"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "13"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 7
+        }
+      ],
+      "source": [
+        "#delete the dublicate values\n",
+        "data.duplicated().sum() # count the total duplicate samples"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 8,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "Henr5CzCg1DM",
+        "outputId": "b47b917a-f74f-4a41-be13-acbaeffa1d9a"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "488"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 8
+        }
+      ],
+      "source": [
+        "#there can be dublicate of author names so check for the dublicate headline and short discription\n",
+        "data.duplicated(subset=['headline', 'short_description']).sum()"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 9,
+      "metadata": {
+        "id": "d0Q_8z2yhBkz"
+      },
+      "outputs": [],
+      "source": [
+        "# Drop duplicates with empty headline or empty description\n",
+        "data.drop_duplicates(subset=['headline', 'short_description'],inplace=True,keep='last')"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 10,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 292
+        },
+        "id": "spYt_-sAhD_z",
+        "outputId": "fce240d5-8b99-4f13-8401-615d92fe7001"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "/usr/local/lib/python3.7/dist-packages/ipykernel_launcher.py:1: FutureWarning: Treating datetime data as categorical rather than numeric in `.describe` is deprecated and will be removed in a future version of pandas. Specify `datetime_is_numeric=True` to silence this warning and adopt the future behavior now.\n",
+            "  \"\"\"Entry point for launching an IPython kernel.\n"
+          ]
+        },
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "        category        headline authors  \\\n",
+              "count     200365          200365  200365   \n",
+              "unique        41          199344   27986   \n",
+              "top     POLITICS  Sunday Roundup           \n",
+              "freq       32719              90   36514   \n",
+              "first        NaN             NaN     NaN   \n",
+              "last         NaN             NaN     NaN   \n",
+              "\n",
+              "                                                     link short_description  \\\n",
+              "count                                              200365            200365   \n",
+              "unique                                             200341            178353   \n",
+              "top     https://www.huffingtonpost.comhttp://testkitch...                     \n",
+              "freq                                                    2             19611   \n",
+              "first                                                 NaN               NaN   \n",
+              "last                                                  NaN               NaN   \n",
+              "\n",
+              "                       date  \n",
+              "count                200365  \n",
+              "unique                 2309  \n",
+              "top     2012-07-18 00:00:00  \n",
+              "freq                    100  \n",
+              "first   2012-01-28 00:00:00  \n",
+              "last    2018-05-26 00:00:00  "
+            ],
+            "text/html": [
+              "\n",
+              "  <div id=\"df-d59eef8c-79a7-4a13-a323-abb5da939041\">\n",
+              "    <div class=\"colab-df-container\">\n",
+              "      <div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>category</th>\n",
+              "      <th>headline</th>\n",
+              "      <th>authors</th>\n",
+              "      <th>link</th>\n",
+              "      <th>short_description</th>\n",
+              "      <th>date</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>count</th>\n",
+              "      <td>200365</td>\n",
+              "      <td>200365</td>\n",
+              "      <td>200365</td>\n",
+              "      <td>200365</td>\n",
+              "      <td>200365</td>\n",
+              "      <td>200365</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>unique</th>\n",
+              "      <td>41</td>\n",
+              "      <td>199344</td>\n",
+              "      <td>27986</td>\n",
+              "      <td>200341</td>\n",
+              "      <td>178353</td>\n",
+              "      <td>2309</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>top</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>Sunday Roundup</td>\n",
+              "      <td></td>\n",
+              "      <td>https://www.huffingtonpost.comhttp://testkitch...</td>\n",
+              "      <td></td>\n",
+              "      <td>2012-07-18 00:00:00</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>freq</th>\n",
+              "      <td>32719</td>\n",
+              "      <td>90</td>\n",
+              "      <td>36514</td>\n",
+              "      <td>2</td>\n",
+              "      <td>19611</td>\n",
+              "      <td>100</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>first</th>\n",
+              "      <td>NaN</td>\n",
+              "      <td>NaN</td>\n",
+              "      <td>NaN</td>\n",
+              "      <td>NaN</td>\n",
+              "      <td>NaN</td>\n",
+              "      <td>2012-01-28 00:00:00</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>last</th>\n",
+              "      <td>NaN</td>\n",
+              "      <td>NaN</td>\n",
+              "      <td>NaN</td>\n",
+              "      <td>NaN</td>\n",
+              "      <td>NaN</td>\n",
+              "      <td>2018-05-26 00:00:00</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>\n",
+              "      <button class=\"colab-df-convert\" onclick=\"convertToInteractive('df-d59eef8c-79a7-4a13-a323-abb5da939041')\"\n",
+              "              title=\"Convert this dataframe to an interactive table.\"\n",
+              "              style=\"display:none;\">\n",
+              "        \n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\"viewBox=\"0 0 24 24\"\n",
+              "       width=\"24px\">\n",
+              "    <path d=\"M0 0h24v24H0V0z\" fill=\"none\"/>\n",
+              "    <path d=\"M18.56 5.44l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94zm-11 1L8.5 8.5l.94-2.06 2.06-.94-2.06-.94L8.5 2.5l-.94 2.06-2.06.94zm10 10l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94z\"/><path d=\"M17.41 7.96l-1.37-1.37c-.4-.4-.92-.59-1.43-.59-.52 0-1.04.2-1.43.59L10.3 9.45l-7.72 7.72c-.78.78-.78 2.05 0 2.83L4 21.41c.39.39.9.59 1.41.59.51 0 1.02-.2 1.41-.59l7.78-7.78 2.81-2.81c.8-.78.8-2.07 0-2.86zM5.41 20L4 18.59l7.72-7.72 1.47 1.35L5.41 20z\"/>\n",
+              "  </svg>\n",
+              "      </button>\n",
+              "      \n",
+              "  <style>\n",
+              "    .colab-df-container {\n",
+              "      display:flex;\n",
+              "      flex-wrap:wrap;\n",
+              "      gap: 12px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert {\n",
+              "      background-color: #E8F0FE;\n",
+              "      border: none;\n",
+              "      border-radius: 50%;\n",
+              "      cursor: pointer;\n",
+              "      display: none;\n",
+              "      fill: #1967D2;\n",
+              "      height: 32px;\n",
+              "      padding: 0 0 0 0;\n",
+              "      width: 32px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert:hover {\n",
+              "      background-color: #E2EBFA;\n",
+              "      box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "      fill: #174EA6;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert {\n",
+              "      background-color: #3B4455;\n",
+              "      fill: #D2E3FC;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert:hover {\n",
+              "      background-color: #434B5C;\n",
+              "      box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "      filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "      fill: #FFFFFF;\n",
+              "    }\n",
+              "  </style>\n",
+              "\n",
+              "      <script>\n",
+              "        const buttonEl =\n",
+              "          document.querySelector('#df-d59eef8c-79a7-4a13-a323-abb5da939041 button.colab-df-convert');\n",
+              "        buttonEl.style.display =\n",
+              "          google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "        async function convertToInteractive(key) {\n",
+              "          const element = document.querySelector('#df-d59eef8c-79a7-4a13-a323-abb5da939041');\n",
+              "          const dataTable =\n",
+              "            await google.colab.kernel.invokeFunction('convertToInteractive',\n",
+              "                                                     [key], {});\n",
+              "          if (!dataTable) return;\n",
+              "\n",
+              "          const docLinkHtml = 'Like what you see? Visit the ' +\n",
+              "            '<a target=\"_blank\" href=https://colab.research.google.com/notebooks/data_table.ipynb>data table notebook</a>'\n",
+              "            + ' to learn more about interactive tables.';\n",
+              "          element.innerHTML = '';\n",
+              "          dataTable['output_type'] = 'display_data';\n",
+              "          await google.colab.output.renderOutput(dataTable, element);\n",
+              "          const docLink = document.createElement('div');\n",
+              "          docLink.innerHTML = docLinkHtml;\n",
+              "          element.appendChild(docLink);\n",
+              "        }\n",
+              "      </script>\n",
+              "    </div>\n",
+              "  </div>\n",
+              "  "
+            ]
+          },
+          "metadata": {},
+          "execution_count": 10
+        }
+      ],
+      "source": [
+        "data.describe()"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 10,
+      "metadata": {
+        "id": "X-wP5_UAhI-r"
+      },
+      "outputs": [],
+      "source": [
+        ""
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "23LFS9GIhJbr"
+      },
+      "source": [
+        "#Handling null data\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 11,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "K9VkO55PhKqI",
+        "outputId": "de561512-8673-4680-b823-c3c4f6094e11"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "category             0\n",
+              "headline             0\n",
+              "authors              0\n",
+              "link                 0\n",
+              "short_description    0\n",
+              "date                 0\n",
+              "dtype: int64"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 11
+        }
+      ],
+      "source": [
+        "data.isnull().sum()"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 12,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 191
+        },
+        "id": "-j-CcAhShNlE",
+        "outputId": "3d611546-f858-4e6e-8272-7beb6f428c88"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "            category headline  \\\n",
+              "86893       RELIGION            \n",
+              "113471  QUEER VOICES            \n",
+              "\n",
+              "                                                  authors  \\\n",
+              "86893   Matthew Fox, ContributorRadical theologian Mat...   \n",
+              "113471  Gary Snyder, ContributorWriter and Media Strat...   \n",
+              "\n",
+              "                                                     link  \\\n",
+              "86893   https://www.huffingtonpost.com/entry/post_9671...   \n",
+              "113471  https://www.huffingtonpost.com/entry/beverly-h...   \n",
+              "\n",
+              "                                        short_description       date  \n",
+              "86893   Let everyone not wrapped in tired and disprove... 2015-06-30  \n",
+              "113471                                                    2014-08-28  "
+            ],
+            "text/html": [
+              "\n",
+              "  <div id=\"df-03ed5740-7c1f-49aa-a1ea-b2a2d2b8cc7f\">\n",
+              "    <div class=\"colab-df-container\">\n",
+              "      <div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>category</th>\n",
+              "      <th>headline</th>\n",
+              "      <th>authors</th>\n",
+              "      <th>link</th>\n",
+              "      <th>short_description</th>\n",
+              "      <th>date</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>86893</th>\n",
+              "      <td>RELIGION</td>\n",
+              "      <td></td>\n",
+              "      <td>Matthew Fox, ContributorRadical theologian Mat...</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/post_9671...</td>\n",
+              "      <td>Let everyone not wrapped in tired and disprove...</td>\n",
+              "      <td>2015-06-30</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>113471</th>\n",
+              "      <td>QUEER VOICES</td>\n",
+              "      <td></td>\n",
+              "      <td>Gary Snyder, ContributorWriter and Media Strat...</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/beverly-h...</td>\n",
+              "      <td></td>\n",
+              "      <td>2014-08-28</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>\n",
+              "      <button class=\"colab-df-convert\" onclick=\"convertToInteractive('df-03ed5740-7c1f-49aa-a1ea-b2a2d2b8cc7f')\"\n",
+              "              title=\"Convert this dataframe to an interactive table.\"\n",
+              "              style=\"display:none;\">\n",
+              "        \n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\"viewBox=\"0 0 24 24\"\n",
+              "       width=\"24px\">\n",
+              "    <path d=\"M0 0h24v24H0V0z\" fill=\"none\"/>\n",
+              "    <path d=\"M18.56 5.44l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94zm-11 1L8.5 8.5l.94-2.06 2.06-.94-2.06-.94L8.5 2.5l-.94 2.06-2.06.94zm10 10l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94z\"/><path d=\"M17.41 7.96l-1.37-1.37c-.4-.4-.92-.59-1.43-.59-.52 0-1.04.2-1.43.59L10.3 9.45l-7.72 7.72c-.78.78-.78 2.05 0 2.83L4 21.41c.39.39.9.59 1.41.59.51 0 1.02-.2 1.41-.59l7.78-7.78 2.81-2.81c.8-.78.8-2.07 0-2.86zM5.41 20L4 18.59l7.72-7.72 1.47 1.35L5.41 20z\"/>\n",
+              "  </svg>\n",
+              "      </button>\n",
+              "      \n",
+              "  <style>\n",
+              "    .colab-df-container {\n",
+              "      display:flex;\n",
+              "      flex-wrap:wrap;\n",
+              "      gap: 12px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert {\n",
+              "      background-color: #E8F0FE;\n",
+              "      border: none;\n",
+              "      border-radius: 50%;\n",
+              "      cursor: pointer;\n",
+              "      display: none;\n",
+              "      fill: #1967D2;\n",
+              "      height: 32px;\n",
+              "      padding: 0 0 0 0;\n",
+              "      width: 32px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert:hover {\n",
+              "      background-color: #E2EBFA;\n",
+              "      box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "      fill: #174EA6;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert {\n",
+              "      background-color: #3B4455;\n",
+              "      fill: #D2E3FC;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert:hover {\n",
+              "      background-color: #434B5C;\n",
+              "      box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "      filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "      fill: #FFFFFF;\n",
+              "    }\n",
+              "  </style>\n",
+              "\n",
+              "      <script>\n",
+              "        const buttonEl =\n",
+              "          document.querySelector('#df-03ed5740-7c1f-49aa-a1ea-b2a2d2b8cc7f button.colab-df-convert');\n",
+              "        buttonEl.style.display =\n",
+              "          google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "        async function convertToInteractive(key) {\n",
+              "          const element = document.querySelector('#df-03ed5740-7c1f-49aa-a1ea-b2a2d2b8cc7f');\n",
+              "          const dataTable =\n",
+              "            await google.colab.kernel.invokeFunction('convertToInteractive',\n",
+              "                                                     [key], {});\n",
+              "          if (!dataTable) return;\n",
+              "\n",
+              "          const docLinkHtml = 'Like what you see? Visit the ' +\n",
+              "            '<a target=\"_blank\" href=https://colab.research.google.com/notebooks/data_table.ipynb>data table notebook</a>'\n",
+              "            + ' to learn more about interactive tables.';\n",
+              "          element.innerHTML = '';\n",
+              "          dataTable['output_type'] = 'display_data';\n",
+              "          await google.colab.output.renderOutput(dataTable, element);\n",
+              "          const docLink = document.createElement('div');\n",
+              "          docLink.innerHTML = docLinkHtml;\n",
+              "          element.appendChild(docLink);\n",
+              "        }\n",
+              "      </script>\n",
+              "    </div>\n",
+              "  </div>\n",
+              "  "
+            ]
+          },
+          "metadata": {},
+          "execution_count": 12
+        }
+      ],
+      "source": [
+        "# there is no null value instead of null they are blank so we need to check for the blank placess and delete that\n",
+        "data[data['headline'] == '']"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 13,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "c0mj0n1nhTZP",
+        "outputId": "39971232-14f8-47cf-a7a8-17da02cbed1d"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "THe length of the datset ------> (200363, 6)\n"
+          ]
+        }
+      ],
+      "source": [
+        "# drop the blank values\n",
+        "headline_blank = data['headline'] == ''\n",
+        "data = data[~headline_blank]\n",
+        "print(\"THe length of the datset ------>\",data.shape)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 14,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "E9tJSewWhXpC",
+        "outputId": "d1154c53-7481-4c81-a083-bb9b692569e7"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "the lenth of the blank description samples-----> 19610\n",
+            "THe length of the datset ----------------------> (180753, 6)\n"
+          ]
+        }
+      ],
+      "source": [
+        "#drop the blank short describtion column\n",
+        "description_blank = data['short_description']==''\n",
+        "print(\"the lenth of the blank description samples----->\",len(data[description_blank]))\n",
+        "data = data[~description_blank]\n",
+        "print(\"THe length of the datset ---------------------->\",data.shape)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## Balance datasets and process text"
+      ],
+      "metadata": {
+        "id": "VBkhGZggEqgf"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "fo1GzS4-hh75"
+      },
+      "source": [
+        "### Balance the Category Data\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 15,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "EnijuIZmhm3a",
+        "outputId": "d08b30e4-4403-44fe-f070-a09d218f6bcc"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "['POLITICS',\n",
+              " 'WELLNESS',\n",
+              " 'ENTERTAINMENT',\n",
+              " 'STYLE & BEAUTY',\n",
+              " 'TRAVEL',\n",
+              " 'PARENTING',\n",
+              " 'FOOD & DRINK',\n",
+              " 'QUEER VOICES',\n",
+              " 'HEALTHY LIVING',\n",
+              " 'BUSINESS',\n",
+              " 'COMEDY',\n",
+              " 'SPORTS',\n",
+              " 'HOME & LIVING',\n",
+              " 'BLACK VOICES',\n",
+              " 'THE WORLDPOST',\n",
+              " 'WEDDINGS',\n",
+              " 'PARENTS',\n",
+              " 'DIVORCE',\n",
+              " 'IMPACT',\n",
+              " 'WOMEN',\n",
+              " 'CRIME',\n",
+              " 'MEDIA',\n",
+              " 'WEIRD NEWS',\n",
+              " 'WORLD NEWS',\n",
+              " 'GREEN',\n",
+              " 'TECH',\n",
+              " 'TASTE',\n",
+              " 'RELIGION',\n",
+              " 'SCIENCE',\n",
+              " 'MONEY',\n",
+              " 'STYLE',\n",
+              " 'ARTS & CULTURE',\n",
+              " 'ENVIRONMENT',\n",
+              " 'WORLDPOST',\n",
+              " 'FIFTY',\n",
+              " 'GOOD NEWS',\n",
+              " 'LATINO VOICES',\n",
+              " 'CULTURE & ARTS',\n",
+              " 'COLLEGE',\n",
+              " 'EDUCATION',\n",
+              " 'ARTS']"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 15
+        }
+      ],
+      "source": [
+        "category = data['category'].value_counts()\n",
+        "list(category.index)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 16,
+      "metadata": {
+        "id": "4W5Wjutrhn9T"
+      },
+      "outputs": [],
+      "source": [
+        "cateo_keep = (data['category'] == 'POLITICS') | (data['category'] == 'WELLNESS' )| (data['category'] == 'ENTERTAINMENT') | (data['category'] == 'TRAVEL') | \\\n",
+        "            (data['category'] == 'STYLE & BEAUTY') | (data['category'] == 'PARENTING' )| (data['category'] == 'HEALTHY LIVING') | (data['category'] == 'QUEER VOICES') | \\\n",
+        "              (data['category'] == 'FOOD & DRINK') | (data['category'] == 'BUSINESS' )| (data['category'] == 'COMEDY') | (data['category'] == 'PARENTS') | (data['category'] == 'SPORTS') | (data['category'] == 'HOME & LIVING' )| (data['category'] == 'BLACK VOICES')\n",
+        "data = data[cateo_keep]\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 17,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "B7Hd4E2Qh5Oi",
+        "outputId": "ca385988-7059-4385-abeb-29e94ac0d5e8"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "0         False\n",
+              "1          True\n",
+              "2          True\n",
+              "3          True\n",
+              "4          True\n",
+              "          ...  \n",
+              "200848    False\n",
+              "200849     True\n",
+              "200850     True\n",
+              "200851     True\n",
+              "200852     True\n",
+              "Name: category, Length: 180753, dtype: bool"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 17
+        }
+      ],
+      "source": [
+        "cateo_keep"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 18,
+      "metadata": {
+        "id": "4Akovo2FiEar"
+      },
+      "outputs": [],
+      "source": [
+        "cateo_keep = (data['category'] == 'POLITICS') | (data['category'] == 'WELLNESS' )| (data['category'] == 'ENTERTAINMENT') | (data['category'] == 'TRAVEL') | \\\n",
+        "            (data['category'] == 'STYLE & BEAUTY') | (data['category'] == 'PARENTING' )| (data['category'] == 'HEALTHY LIVING') | (data['category'] == 'QUEER VOICES') | \\\n",
+        "              (data['category'] == 'FOOD & DRINK') | (data['category'] == 'BUSINESS' )| (data['category'] == 'COMEDY') | (data['category'] == 'PARENTS') | (data['category'] == 'SPORTS') | (data['category'] == 'HOME & LIVING' )| (data['category'] == 'BLACK VOICES')\n",
+        "data = data[cateo_keep]\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Inspect size of each category that we keep\n",
+        "category = data['category'].value_counts()\n",
+        "plt.figure(figsize=(25,13))\n",
+        "sns.barplot(y=category.index,x=category.values)\n",
+        "plt.title(\"The distribution of categories\")\n",
+        "plt.xlabel(\"Category\")\n",
+        "plt.ylabel(\"The number of samples\")\n",
+        "\n",
+        "plt.yticks(rotation=0,fontsize = 16)\n",
+        "plt.show()\n",
+        "plt.savefig(r\"./category_bar.png\")"
+      ],
+      "metadata": {
+        "id": "HB4GKbi2EPaV",
+        "outputId": "7389f0c5-c421-4586-9da3-fb96a1e96f19",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 645
+        }
+      },
+      "execution_count": 19,
+      "outputs": [
+        {
+          "output_type": "display_data",
+          "data": {
+            "text/plain": [
+              "<Figure size 1800x936 with 1 Axes>"
+            ],
+            "image/png": "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\n"
+          },
+          "metadata": {
+            "needs_background": "light"
+          }
+        },
+        {
+          "output_type": "display_data",
+          "data": {
+            "text/plain": [
+              "<Figure size 432x288 with 0 Axes>"
+            ]
+          },
+          "metadata": {}
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 20,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "b76GYOSZiG9D",
+        "outputId": "63f2c3d3-7357-4c7c-cf07-cc6c1bd8822c"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "POLITICS          3000\n",
+              "WELLNESS          3000\n",
+              "ENTERTAINMENT     3000\n",
+              "TRAVEL            3000\n",
+              "STYLE & BEAUTY    3000\n",
+              "PARENTING         3000\n",
+              "HEALTHY LIVING    3000\n",
+              "QUEER VOICES      3000\n",
+              "FOOD & DRINK      3000\n",
+              "BUSINESS          3000\n",
+              "COMEDY            3000\n",
+              "PARENTS           3000\n",
+              "SPORTS            3000\n",
+              "HOME & LIVING     3000\n",
+              "BLACK VOICES      3000\n",
+              "Name: category, dtype: int64"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 20
+        }
+      ],
+      "source": [
+        "# To balance the data for better prediction, sample each of the category with 3000 samples\n",
+        "data_1 = data[data['category'] == 'POLITICS']\n",
+        "data_1 = resample(data_1, replace=False, n_samples=3000, random_state=123)\n",
+        "data_2 = data[data['category'] == 'WELLNESS']\n",
+        "data_2 = resample(data_2, replace=False, n_samples=3000, random_state=123)\n",
+        "data_3 = data[data['category'] == 'ENTERTAINMENT']\n",
+        "data_3 = resample(data_3, replace=False, n_samples=3000, random_state=123)\n",
+        "data_4 = data[data['category'] == 'TRAVEL']\n",
+        "data_4 = resample(data_4, replace=False, n_samples=3000, random_state=123)\n",
+        "data_5 = data[data['category'] == 'STYLE & BEAUTY']\n",
+        "data_5 = resample(data_5, replace=False, n_samples=3000, random_state=123)\n",
+        "data_6 = data[data['category'] == 'PARENTING']\n",
+        "data_6 = resample(data_6, replace=False, n_samples=3000, random_state=123)\n",
+        "data_7 = data[data['category'] == 'HEALTHY LIVING']\n",
+        "data_7 = resample(data_7, replace=False, n_samples=3000, random_state=123)\n",
+        "data_8 = data[data['category'] == 'QUEER VOICES']\n",
+        "data_8 = resample(data_8, replace=False, n_samples=3000, random_state=123)\n",
+        "data_9 = data[data['category'] == 'FOOD & DRINK']\n",
+        "data_9 = resample(data_9, replace=False, n_samples=3000, random_state=123)\n",
+        "data_10 = data[data['category'] == 'BUSINESS']\n",
+        "data_10 = resample(data_10, replace=False, n_samples=3000, random_state=123)\n",
+        "data_11 = data[data['category'] == 'COMEDY']\n",
+        "data_11 = resample(data_11, replace=False, n_samples=3000, random_state=123)\n",
+        "data_12= data[data['category'] == 'PARENTS']\n",
+        "data_12 = resample(data_12, replace=False, n_samples=3000, random_state=123)\n",
+        "data_13= data[data['category'] == 'SPORTS']\n",
+        "data_13 = resample(data_13, replace=False, n_samples=3000, random_state=123)\n",
+        "data_14 = data[data['category'] == 'HOME & LIVING']\n",
+        "data_14 = resample(data_14, replace=False, n_samples=3000, random_state=123)\n",
+        "data_15 = data[data['category'] == 'BLACK VOICES']\n",
+        "data_15 = resample(data_15, replace=False, n_samples=3000, random_state=123)\n",
+        "\n",
+        "cato_list = [data_1 , data_2 , data_3 , data_4 ,data_5 , data_6 , data_7, data_8 , data_9 , data_10, data_11 , data_12 , data_13, data_14 ,data_15]\n",
+        "\n",
+        "data = pd.concat(cato_list)\n",
+        "data['category'].value_counts()"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 21,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 337
+        },
+        "id": "ujQdHQj0iNBg",
+        "outputId": "ebf0823c-f36c-48ed-ee83-4755589d120a"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "        category                                           headline  \\\n",
+              "77976   POLITICS  Republican Activists Increasingly Favor Outsid...   \n",
+              "46953   POLITICS  A Crooked Wall Street Billionaire Is Crafting ...   \n",
+              "356     POLITICS  GOP Candidate Set Up Trust That Pays His Kids ...   \n",
+              "106292  POLITICS  The U.S. Isn't in the Business of Bigotry, Are...   \n",
+              "67266   POLITICS  Bernie Sanders On 'SNL' Is Everything We Hoped...   \n",
+              "\n",
+              "                                                  authors  \\\n",
+              "77976              Mark Blumenthal and Ariel Edwards-Levy   \n",
+              "46953                                         Zach Carter   \n",
+              "356                                        Mary Papenfuss   \n",
+              "106292  Terry O'Neill, ContributorPresident, National ...   \n",
+              "67266                                      Paige Lavender   \n",
+              "\n",
+              "                                                     link  \\\n",
+              "77976   https://www.huffingtonpost.com/entry/republica...   \n",
+              "46953   https://www.huffingtonpost.com/entry/a-crooked...   \n",
+              "356     https://www.huffingtonpost.com/entry/vickers-c...   \n",
+              "106292  https://www.huffingtonpost.com/entry/the-us-do...   \n",
+              "67266   https://www.huffingtonpost.com/entry/bernie-sa...   \n",
+              "\n",
+              "                                        short_description       date  \n",
+              "77976   Is this election an anomaly, or will the party... 2015-10-09  \n",
+              "46953                                            Hoo boy. 2016-09-26  \n",
+              "356     Even his own mom calls him a bigot, but former... 2018-05-19  \n",
+              "106292  Birth control is life-saving, life-affirming h... 2014-11-19  \n",
+              "67266                                            Amazing. 2016-02-07  "
+            ],
+            "text/html": [
+              "\n",
+              "  <div id=\"df-7fa97e1b-7c51-4a6f-9e7d-56d86324fa55\">\n",
+              "    <div class=\"colab-df-container\">\n",
+              "      <div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>category</th>\n",
+              "      <th>headline</th>\n",
+              "      <th>authors</th>\n",
+              "      <th>link</th>\n",
+              "      <th>short_description</th>\n",
+              "      <th>date</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>77976</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>Republican Activists Increasingly Favor Outsid...</td>\n",
+              "      <td>Mark Blumenthal and Ariel Edwards-Levy</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/republica...</td>\n",
+              "      <td>Is this election an anomaly, or will the party...</td>\n",
+              "      <td>2015-10-09</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>46953</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>A Crooked Wall Street Billionaire Is Crafting ...</td>\n",
+              "      <td>Zach Carter</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/a-crooked...</td>\n",
+              "      <td>Hoo boy.</td>\n",
+              "      <td>2016-09-26</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>356</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>GOP Candidate Set Up Trust That Pays His Kids ...</td>\n",
+              "      <td>Mary Papenfuss</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/vickers-c...</td>\n",
+              "      <td>Even his own mom calls him a bigot, but former...</td>\n",
+              "      <td>2018-05-19</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>106292</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>The U.S. Isn't in the Business of Bigotry, Are...</td>\n",
+              "      <td>Terry O'Neill, ContributorPresident, National ...</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/the-us-do...</td>\n",
+              "      <td>Birth control is life-saving, life-affirming h...</td>\n",
+              "      <td>2014-11-19</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>67266</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>Bernie Sanders On 'SNL' Is Everything We Hoped...</td>\n",
+              "      <td>Paige Lavender</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/bernie-sa...</td>\n",
+              "      <td>Amazing.</td>\n",
+              "      <td>2016-02-07</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>\n",
+              "      <button class=\"colab-df-convert\" onclick=\"convertToInteractive('df-7fa97e1b-7c51-4a6f-9e7d-56d86324fa55')\"\n",
+              "              title=\"Convert this dataframe to an interactive table.\"\n",
+              "              style=\"display:none;\">\n",
+              "        \n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\"viewBox=\"0 0 24 24\"\n",
+              "       width=\"24px\">\n",
+              "    <path d=\"M0 0h24v24H0V0z\" fill=\"none\"/>\n",
+              "    <path d=\"M18.56 5.44l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94zm-11 1L8.5 8.5l.94-2.06 2.06-.94-2.06-.94L8.5 2.5l-.94 2.06-2.06.94zm10 10l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94z\"/><path d=\"M17.41 7.96l-1.37-1.37c-.4-.4-.92-.59-1.43-.59-.52 0-1.04.2-1.43.59L10.3 9.45l-7.72 7.72c-.78.78-.78 2.05 0 2.83L4 21.41c.39.39.9.59 1.41.59.51 0 1.02-.2 1.41-.59l7.78-7.78 2.81-2.81c.8-.78.8-2.07 0-2.86zM5.41 20L4 18.59l7.72-7.72 1.47 1.35L5.41 20z\"/>\n",
+              "  </svg>\n",
+              "      </button>\n",
+              "      \n",
+              "  <style>\n",
+              "    .colab-df-container {\n",
+              "      display:flex;\n",
+              "      flex-wrap:wrap;\n",
+              "      gap: 12px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert {\n",
+              "      background-color: #E8F0FE;\n",
+              "      border: none;\n",
+              "      border-radius: 50%;\n",
+              "      cursor: pointer;\n",
+              "      display: none;\n",
+              "      fill: #1967D2;\n",
+              "      height: 32px;\n",
+              "      padding: 0 0 0 0;\n",
+              "      width: 32px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert:hover {\n",
+              "      background-color: #E2EBFA;\n",
+              "      box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "      fill: #174EA6;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert {\n",
+              "      background-color: #3B4455;\n",
+              "      fill: #D2E3FC;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert:hover {\n",
+              "      background-color: #434B5C;\n",
+              "      box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "      filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "      fill: #FFFFFF;\n",
+              "    }\n",
+              "  </style>\n",
+              "\n",
+              "      <script>\n",
+              "        const buttonEl =\n",
+              "          document.querySelector('#df-7fa97e1b-7c51-4a6f-9e7d-56d86324fa55 button.colab-df-convert');\n",
+              "        buttonEl.style.display =\n",
+              "          google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "        async function convertToInteractive(key) {\n",
+              "          const element = document.querySelector('#df-7fa97e1b-7c51-4a6f-9e7d-56d86324fa55');\n",
+              "          const dataTable =\n",
+              "            await google.colab.kernel.invokeFunction('convertToInteractive',\n",
+              "                                                     [key], {});\n",
+              "          if (!dataTable) return;\n",
+              "\n",
+              "          const docLinkHtml = 'Like what you see? Visit the ' +\n",
+              "            '<a target=\"_blank\" href=https://colab.research.google.com/notebooks/data_table.ipynb>data table notebook</a>'\n",
+              "            + ' to learn more about interactive tables.';\n",
+              "          element.innerHTML = '';\n",
+              "          dataTable['output_type'] = 'display_data';\n",
+              "          await google.colab.output.renderOutput(dataTable, element);\n",
+              "          const docLink = document.createElement('div');\n",
+              "          docLink.innerHTML = docLinkHtml;\n",
+              "          element.appendChild(docLink);\n",
+              "        }\n",
+              "      </script>\n",
+              "    </div>\n",
+              "  </div>\n",
+              "  "
+            ]
+          },
+          "metadata": {},
+          "execution_count": 21
+        }
+      ],
+      "source": [
+        "data.head(5)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "NDJlf3cDiXqq"
+      },
+      "source": [
+        "### Combining the column\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 22,
+      "metadata": {
+        "id": "xSEV5q4HiZKv"
+      },
+      "outputs": [],
+      "source": [
+        "data['text'] = data['headline']+'-'+data['short_description']"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 23,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 406
+        },
+        "id": "ApS5h7hqiZ6z",
+        "outputId": "4953b796-832a-4b92-996c-722dd9846c3a"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "        category                                           headline  \\\n",
+              "77976   POLITICS  Republican Activists Increasingly Favor Outsid...   \n",
+              "46953   POLITICS  A Crooked Wall Street Billionaire Is Crafting ...   \n",
+              "356     POLITICS  GOP Candidate Set Up Trust That Pays His Kids ...   \n",
+              "106292  POLITICS  The U.S. Isn't in the Business of Bigotry, Are...   \n",
+              "67266   POLITICS  Bernie Sanders On 'SNL' Is Everything We Hoped...   \n",
+              "\n",
+              "                                                  authors  \\\n",
+              "77976              Mark Blumenthal and Ariel Edwards-Levy   \n",
+              "46953                                         Zach Carter   \n",
+              "356                                        Mary Papenfuss   \n",
+              "106292  Terry O'Neill, ContributorPresident, National ...   \n",
+              "67266                                      Paige Lavender   \n",
+              "\n",
+              "                                                     link  \\\n",
+              "77976   https://www.huffingtonpost.com/entry/republica...   \n",
+              "46953   https://www.huffingtonpost.com/entry/a-crooked...   \n",
+              "356     https://www.huffingtonpost.com/entry/vickers-c...   \n",
+              "106292  https://www.huffingtonpost.com/entry/the-us-do...   \n",
+              "67266   https://www.huffingtonpost.com/entry/bernie-sa...   \n",
+              "\n",
+              "                                        short_description       date  \\\n",
+              "77976   Is this election an anomaly, or will the party... 2015-10-09   \n",
+              "46953                                            Hoo boy. 2016-09-26   \n",
+              "356     Even his own mom calls him a bigot, but former... 2018-05-19   \n",
+              "106292  Birth control is life-saving, life-affirming h... 2014-11-19   \n",
+              "67266                                            Amazing. 2016-02-07   \n",
+              "\n",
+              "                                                     text  \n",
+              "77976   Republican Activists Increasingly Favor Outsid...  \n",
+              "46953   A Crooked Wall Street Billionaire Is Crafting ...  \n",
+              "356     GOP Candidate Set Up Trust That Pays His Kids ...  \n",
+              "106292  The U.S. Isn't in the Business of Bigotry, Are...  \n",
+              "67266   Bernie Sanders On 'SNL' Is Everything We Hoped...  "
+            ],
+            "text/html": [
+              "\n",
+              "  <div id=\"df-939e97d2-aa20-4e9c-815c-6cbacd87bcc6\">\n",
+              "    <div class=\"colab-df-container\">\n",
+              "      <div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>category</th>\n",
+              "      <th>headline</th>\n",
+              "      <th>authors</th>\n",
+              "      <th>link</th>\n",
+              "      <th>short_description</th>\n",
+              "      <th>date</th>\n",
+              "      <th>text</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>77976</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>Republican Activists Increasingly Favor Outsid...</td>\n",
+              "      <td>Mark Blumenthal and Ariel Edwards-Levy</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/republica...</td>\n",
+              "      <td>Is this election an anomaly, or will the party...</td>\n",
+              "      <td>2015-10-09</td>\n",
+              "      <td>Republican Activists Increasingly Favor Outsid...</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>46953</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>A Crooked Wall Street Billionaire Is Crafting ...</td>\n",
+              "      <td>Zach Carter</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/a-crooked...</td>\n",
+              "      <td>Hoo boy.</td>\n",
+              "      <td>2016-09-26</td>\n",
+              "      <td>A Crooked Wall Street Billionaire Is Crafting ...</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>356</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>GOP Candidate Set Up Trust That Pays His Kids ...</td>\n",
+              "      <td>Mary Papenfuss</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/vickers-c...</td>\n",
+              "      <td>Even his own mom calls him a bigot, but former...</td>\n",
+              "      <td>2018-05-19</td>\n",
+              "      <td>GOP Candidate Set Up Trust That Pays His Kids ...</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>106292</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>The U.S. Isn't in the Business of Bigotry, Are...</td>\n",
+              "      <td>Terry O'Neill, ContributorPresident, National ...</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/the-us-do...</td>\n",
+              "      <td>Birth control is life-saving, life-affirming h...</td>\n",
+              "      <td>2014-11-19</td>\n",
+              "      <td>The U.S. Isn't in the Business of Bigotry, Are...</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>67266</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>Bernie Sanders On 'SNL' Is Everything We Hoped...</td>\n",
+              "      <td>Paige Lavender</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/bernie-sa...</td>\n",
+              "      <td>Amazing.</td>\n",
+              "      <td>2016-02-07</td>\n",
+              "      <td>Bernie Sanders On 'SNL' Is Everything We Hoped...</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>\n",
+              "      <button class=\"colab-df-convert\" onclick=\"convertToInteractive('df-939e97d2-aa20-4e9c-815c-6cbacd87bcc6')\"\n",
+              "              title=\"Convert this dataframe to an interactive table.\"\n",
+              "              style=\"display:none;\">\n",
+              "        \n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\"viewBox=\"0 0 24 24\"\n",
+              "       width=\"24px\">\n",
+              "    <path d=\"M0 0h24v24H0V0z\" fill=\"none\"/>\n",
+              "    <path d=\"M18.56 5.44l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94zm-11 1L8.5 8.5l.94-2.06 2.06-.94-2.06-.94L8.5 2.5l-.94 2.06-2.06.94zm10 10l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94z\"/><path d=\"M17.41 7.96l-1.37-1.37c-.4-.4-.92-.59-1.43-.59-.52 0-1.04.2-1.43.59L10.3 9.45l-7.72 7.72c-.78.78-.78 2.05 0 2.83L4 21.41c.39.39.9.59 1.41.59.51 0 1.02-.2 1.41-.59l7.78-7.78 2.81-2.81c.8-.78.8-2.07 0-2.86zM5.41 20L4 18.59l7.72-7.72 1.47 1.35L5.41 20z\"/>\n",
+              "  </svg>\n",
+              "      </button>\n",
+              "      \n",
+              "  <style>\n",
+              "    .colab-df-container {\n",
+              "      display:flex;\n",
+              "      flex-wrap:wrap;\n",
+              "      gap: 12px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert {\n",
+              "      background-color: #E8F0FE;\n",
+              "      border: none;\n",
+              "      border-radius: 50%;\n",
+              "      cursor: pointer;\n",
+              "      display: none;\n",
+              "      fill: #1967D2;\n",
+              "      height: 32px;\n",
+              "      padding: 0 0 0 0;\n",
+              "      width: 32px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert:hover {\n",
+              "      background-color: #E2EBFA;\n",
+              "      box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "      fill: #174EA6;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert {\n",
+              "      background-color: #3B4455;\n",
+              "      fill: #D2E3FC;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert:hover {\n",
+              "      background-color: #434B5C;\n",
+              "      box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "      filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "      fill: #FFFFFF;\n",
+              "    }\n",
+              "  </style>\n",
+              "\n",
+              "      <script>\n",
+              "        const buttonEl =\n",
+              "          document.querySelector('#df-939e97d2-aa20-4e9c-815c-6cbacd87bcc6 button.colab-df-convert');\n",
+              "        buttonEl.style.display =\n",
+              "          google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "        async function convertToInteractive(key) {\n",
+              "          const element = document.querySelector('#df-939e97d2-aa20-4e9c-815c-6cbacd87bcc6');\n",
+              "          const dataTable =\n",
+              "            await google.colab.kernel.invokeFunction('convertToInteractive',\n",
+              "                                                     [key], {});\n",
+              "          if (!dataTable) return;\n",
+              "\n",
+              "          const docLinkHtml = 'Like what you see? Visit the ' +\n",
+              "            '<a target=\"_blank\" href=https://colab.research.google.com/notebooks/data_table.ipynb>data table notebook</a>'\n",
+              "            + ' to learn more about interactive tables.';\n",
+              "          element.innerHTML = '';\n",
+              "          dataTable['output_type'] = 'display_data';\n",
+              "          await google.colab.output.renderOutput(dataTable, element);\n",
+              "          const docLink = document.createElement('div');\n",
+              "          docLink.innerHTML = docLinkHtml;\n",
+              "          element.appendChild(docLink);\n",
+              "        }\n",
+              "      </script>\n",
+              "    </div>\n",
+              "  </div>\n",
+              "  "
+            ]
+          },
+          "metadata": {},
+          "execution_count": 23
+        }
+      ],
+      "source": [
+        "data.head(5)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Cleaning Text by remove stop words, all lower case, remove url, keep only characters "
+      ],
+      "metadata": {
+        "id": "GZ4tg-YTE-2O"
+      }
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 24,
+      "metadata": {
+        "id": "Xq5te0q5i0mE"
+      },
+      "outputs": [],
+      "source": [
+        "#drop the other columns\n",
+        "data.drop(['authors','headline','short_description'],axis=1,inplace=True)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "\n",
+        "def clean_text(text):\n",
+        "    text = text.lower()                                  # lower-case all characters\n",
+        "    text =  re.sub(r'@\\S+', '',text)                     # remove twitter handles\n",
+        "    text =  re.sub(r'http\\S+', '',text)                  # remove urls\n",
+        "    text =  re.sub(r'pic.\\S+', '',text) \n",
+        "    text =  re.sub(r\"[^a-zA-Z+']\", ' ',text)             # only keeps characters\n",
+        "    text = re.sub(r'\\s+[a-zA-Z]\\s+', ' ', text+' ')      # keep words with length>1 only\n",
+        "    text = \"\".join([i for i in text if i not in string.punctuation])\n",
+        "    words = nltk.tokenize.word_tokenize(text)\n",
+        "    stopwords = nltk.corpus.stopwords.words('english')   # remove stopwords\n",
+        "    text = \" \".join([i for i in words if i not in stopwords and len(i)>2])\n",
+        "    text= re.sub(\"\\s[\\s]+\", \" \",text).strip()            # remove repeated/leading/trailing spaces\n",
+        "    return text"
+      ],
+      "metadata": {
+        "id": "8GmIc0C2E4hn"
+      },
+      "execution_count": 25,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "\n",
+        "# Cleaning the text\n",
+        "data['text'] = data['text'].apply(clean_text)"
+      ],
+      "metadata": {
+        "id": "iuolZhPDFIQz"
+      },
+      "execution_count": 26,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 27,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 175
+        },
+        "id": "1kQ0hiQei397",
+        "outputId": "2892e078-f129-4377-bb17-27f84c8eda75"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "         category                                               link  \\\n",
+              "0  STYLE & BEAUTY  https://www.huffingtonpost.com/entry/stila-sol...   \n",
+              "1        POLITICS  https://www.huffingtonpost.com/entry/hawaii-re...   \n",
+              "2        WELLNESS  https://www.huffingtonpost.com/entry/learning-...   \n",
+              "3    FOOD & DRINK  https://www.huffingtonpost.com/entry/jam-recip...   \n",
+              "\n",
+              "        date                                               text  \n",
+              "0 2012-02-24  stila solar lighted compact beauty lab beauty ...  \n",
+              "1 2017-08-12  trump north korea hurl threats hawaii prepares...  \n",
+              "2 2013-02-25  history tenacious teacher torturer many histor...  \n",
+              "3 2012-07-05  jam recipes homemade jams jelly preserves phot...  "
+            ],
+            "text/html": [
+              "\n",
+              "  <div id=\"df-4dd05f18-01fb-411d-8e68-2ef24906e6e6\">\n",
+              "    <div class=\"colab-df-container\">\n",
+              "      <div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>category</th>\n",
+              "      <th>link</th>\n",
+              "      <th>date</th>\n",
+              "      <th>text</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>0</th>\n",
+              "      <td>STYLE &amp; BEAUTY</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/stila-sol...</td>\n",
+              "      <td>2012-02-24</td>\n",
+              "      <td>stila solar lighted compact beauty lab beauty ...</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>1</th>\n",
+              "      <td>POLITICS</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/hawaii-re...</td>\n",
+              "      <td>2017-08-12</td>\n",
+              "      <td>trump north korea hurl threats hawaii prepares...</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>2</th>\n",
+              "      <td>WELLNESS</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/learning-...</td>\n",
+              "      <td>2013-02-25</td>\n",
+              "      <td>history tenacious teacher torturer many histor...</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>3</th>\n",
+              "      <td>FOOD &amp; DRINK</td>\n",
+              "      <td>https://www.huffingtonpost.com/entry/jam-recip...</td>\n",
+              "      <td>2012-07-05</td>\n",
+              "      <td>jam recipes homemade jams jelly preserves phot...</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>\n",
+              "      <button class=\"colab-df-convert\" onclick=\"convertToInteractive('df-4dd05f18-01fb-411d-8e68-2ef24906e6e6')\"\n",
+              "              title=\"Convert this dataframe to an interactive table.\"\n",
+              "              style=\"display:none;\">\n",
+              "        \n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\"viewBox=\"0 0 24 24\"\n",
+              "       width=\"24px\">\n",
+              "    <path d=\"M0 0h24v24H0V0z\" fill=\"none\"/>\n",
+              "    <path d=\"M18.56 5.44l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94zm-11 1L8.5 8.5l.94-2.06 2.06-.94-2.06-.94L8.5 2.5l-.94 2.06-2.06.94zm10 10l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94z\"/><path d=\"M17.41 7.96l-1.37-1.37c-.4-.4-.92-.59-1.43-.59-.52 0-1.04.2-1.43.59L10.3 9.45l-7.72 7.72c-.78.78-.78 2.05 0 2.83L4 21.41c.39.39.9.59 1.41.59.51 0 1.02-.2 1.41-.59l7.78-7.78 2.81-2.81c.8-.78.8-2.07 0-2.86zM5.41 20L4 18.59l7.72-7.72 1.47 1.35L5.41 20z\"/>\n",
+              "  </svg>\n",
+              "      </button>\n",
+              "      \n",
+              "  <style>\n",
+              "    .colab-df-container {\n",
+              "      display:flex;\n",
+              "      flex-wrap:wrap;\n",
+              "      gap: 12px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert {\n",
+              "      background-color: #E8F0FE;\n",
+              "      border: none;\n",
+              "      border-radius: 50%;\n",
+              "      cursor: pointer;\n",
+              "      display: none;\n",
+              "      fill: #1967D2;\n",
+              "      height: 32px;\n",
+              "      padding: 0 0 0 0;\n",
+              "      width: 32px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert:hover {\n",
+              "      background-color: #E2EBFA;\n",
+              "      box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "      fill: #174EA6;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert {\n",
+              "      background-color: #3B4455;\n",
+              "      fill: #D2E3FC;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert:hover {\n",
+              "      background-color: #434B5C;\n",
+              "      box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "      filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "      fill: #FFFFFF;\n",
+              "    }\n",
+              "  </style>\n",
+              "\n",
+              "      <script>\n",
+              "        const buttonEl =\n",
+              "          document.querySelector('#df-4dd05f18-01fb-411d-8e68-2ef24906e6e6 button.colab-df-convert');\n",
+              "        buttonEl.style.display =\n",
+              "          google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "        async function convertToInteractive(key) {\n",
+              "          const element = document.querySelector('#df-4dd05f18-01fb-411d-8e68-2ef24906e6e6');\n",
+              "          const dataTable =\n",
+              "            await google.colab.kernel.invokeFunction('convertToInteractive',\n",
+              "                                                     [key], {});\n",
+              "          if (!dataTable) return;\n",
+              "\n",
+              "          const docLinkHtml = 'Like what you see? Visit the ' +\n",
+              "            '<a target=\"_blank\" href=https://colab.research.google.com/notebooks/data_table.ipynb>data table notebook</a>'\n",
+              "            + ' to learn more about interactive tables.';\n",
+              "          element.innerHTML = '';\n",
+              "          dataTable['output_type'] = 'display_data';\n",
+              "          await google.colab.output.renderOutput(dataTable, element);\n",
+              "          const docLink = document.createElement('div');\n",
+              "          docLink.innerHTML = docLinkHtml;\n",
+              "          element.appendChild(docLink);\n",
+              "        }\n",
+              "      </script>\n",
+              "    </div>\n",
+              "  </div>\n",
+              "  "
+            ]
+          },
+          "metadata": {},
+          "execution_count": 27
+        }
+      ],
+      "source": [
+        "\n",
+        "# shuffle the dataset \n",
+        "from sklearn.utils import shuffle\n",
+        "data = shuffle(data)\n",
+        "data.reset_index(inplace=True, drop=True) \n",
+        "data.head(4)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "7BCK0wUGjSiy"
+      },
+      "source": [
+        "## Training the data\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 28,
+      "metadata": {
+        "id": "etcDO6D_jKTU"
+      },
+      "outputs": [],
+      "source": [
+        "#train and test split\n",
+        "X = data['text']\n",
+        "#label encoding the target\n",
+        "label = LabelEncoder()\n",
+        "y = label.fit_transform(data['category'])\n",
+        "\n",
+        "#split the train and test dataset\n",
+        "corpus_train,corpus_test,y_train,y_test = train_test_split(X,y,test_size = 0.1,random_state=2)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 29,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "IPdux0injUxK",
+        "outputId": "f03dc325-d2f9-4351-abce-2b18e6937dfa"
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "(40500, 5000)"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 29
+        }
+      ],
+      "source": [
+        "#tfidf vectorizer\n",
+        "\n",
+        "vecto =  TfidfVectorizer(stop_words='english',max_df = 0.99,min_df=10,\n",
+        "                                   ngram_range=(1, 2),lowercase=True, max_features=5000)\n",
+        "vecto = vecto.fit(corpus_train)\n",
+        "\n",
+        "X_train = vecto.transform(corpus_train).toarray()\n",
+        "X_test = vecto.transform(corpus_test).toarray()\n",
+        "X_train.shape"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "X_names = vecto.get_feature_names() # Names of the word in the document\n",
+        "y_names = label.inverse_transform(y_train) # All the category names in the train\n",
+        "p_value_limit = 0.85 # P value for chi square test\n",
+        "\n",
+        "\n",
+        "dtf_features = pd.DataFrame()\n",
+        "for cat in np.unique(y_names):\n",
+        "    chi2_val , p = sklearn.feature_selection.chi2(X_train, y_names==cat)\n",
+        "    dtf_features = dtf_features.append(pd.DataFrame(\n",
+        "                   {\"feature\":X_names, \"score\":1-p, \"y\":cat}))\n",
+        "    dtf_features = dtf_features.sort_values([\"y\",\"score\"], \n",
+        "                    ascending=[True,False])\n",
+        "    dtf_features = dtf_features[dtf_features[\"score\"]>p_value_limit]\n",
+        "X_names = dtf_features[\"feature\"].unique().tolist()"
+      ],
+      "metadata": {
+        "id": "wnt0L9MMQkgw",
+        "outputId": "fb1fbe9f-b0db-41bf-9516-855b9a5232ec",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 30,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "/usr/local/lib/python3.7/dist-packages/sklearn/utils/deprecation.py:87: FutureWarning: Function get_feature_names is deprecated; get_feature_names is deprecated in 1.0 and will be removed in 1.2. Please use get_feature_names_out instead.\n",
+            "  warnings.warn(msg, category=FutureWarning)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "for cat in np.unique(y_names):\n",
+        "   print(\"# {}:\".format(cat))\n",
+        "   print(\"  . selected features:\",\n",
+        "         len(dtf_features[dtf_features[\"y\"]==cat]))\n",
+        "   print(\"  . top features:\", \",\".join(\n",
+        "dtf_features[dtf_features[\"y\"]==cat][\"feature\"].values[:10]))\n",
+        "   print(\" \")"
+      ],
+      "metadata": {
+        "id": "7QkPHjE_Qu3p",
+        "outputId": "16bc6b1c-acf0-4c57-cc6c-e0c131232198",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 31,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "# BLACK VOICES:\n",
+            "  . selected features: 728\n",
+            "  . top features: african,african american,african americans,atlanta,ava,bio,black,black history,black lives,black man\n",
+            " \n",
+            "# BUSINESS:\n",
+            "  . selected features: 830\n",
+            "  . top features: bank,bankruptcy,banks,billion,business,ceo,companies,company,consumers,corporate\n",
+            " \n",
+            "# COMEDY:\n",
+            "  . selected features: 571\n",
+            "  . top features: bee,cat,cats,colbert,comedian,comedians,comedy,conan,corden,donald\n",
+            " \n",
+            "# ENTERTAINMENT:\n",
+            "  . selected features: 755\n",
+            "  . top features: actor,album,amy,amy schumer,bachelor,box office,film,game thrones,gomez,kardashian\n",
+            " \n",
+            "# FOOD & DRINK:\n",
+            "  . selected features: 824\n",
+            "  . top features: bacon,baked,baking,barbecue,bbq,beef,beer,best,bread,breakfast\n",
+            " \n",
+            "# HEALTHY LIVING:\n",
+            "  . selected features: 772\n",
+            "  . top features: cancer,depression,diet,disease,gps,gps guide,health,illness,mental,mental health\n",
+            " \n",
+            "# HOME & LIVING:\n",
+            "  . selected features: 860\n",
+            "  . top features: apartment,appraises,bedroom,clean,cleaning,click slideshow,color,country living,craft,craft day\n",
+            " \n",
+            "# PARENTING:\n",
+            "  . selected features: 597\n",
+            "  . top features: babies,baby,birth,breastfeeding,child,children,childrens,cute kid,daughter,kid note\n",
+            " \n",
+            "# PARENTS:\n",
+            "  . selected features: 577\n",
+            "  . top features: adorable,autism,babies,baby,breastfeeding,child,children,dad,dads,daughter\n",
+            " \n",
+            "# POLITICS:\n",
+            "  . selected features: 900\n",
+            "  . top features: abortion,administration,bernie,bernie sanders,campaign,candidate,candidates,carson,climate,clinton\n",
+            " \n",
+            "# QUEER VOICES:\n",
+            "  . selected features: 604\n",
+            "  . top features: aids,anti,anti gay,anti lgbt,anti lgbtq,bisexual,caitlyn,community,drag,drag race\n",
+            " \n",
+            "# SPORTS:\n",
+            "  . selected features: 787\n",
+            "  . top features: athletes,baseball,basketball,bowl,brady,bryant,champion,championship,cleveland,coach\n",
+            " \n",
+            "# STYLE & BEAUTY:\n",
+            "  . selected features: 739\n",
+            "  . top features: beauty,beauty street,best dressed,blonde,bra,carpet,chanel,check,check huffpost,check stylelist\n",
+            " \n",
+            "# TRAVEL:\n",
+            "  . selected features: 798\n",
+            "  . top features: adventure,airline,airlines,airplane,airport,airports,attractions,beach,beaches,caribbean\n",
+            " \n",
+            "# WELLNESS:\n",
+            "  . selected features: 865\n",
+            "  . top features: cancer,connected,connected life,constantly connected,course gps,diabetes,exercise,fearless,fitness,gps\n",
+            " \n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Shape after chi square test\n",
+        "len(X_names), corpus_train.shape"
+      ],
+      "metadata": {
+        "id": "7UtfCazQQzZg",
+        "outputId": "5bf2c8ae-4b64-4b1a-e12c-cf65d9c2757f",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 32,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "(4508, (40500,))"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 32
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# New model after with feature test \n",
+        "vecto_2 = TfidfVectorizer(vocabulary=X_names) \n",
+        "vecto_2.fit(corpus_train)\n",
+        "X_train_2 = vecto_2.transform(corpus_train)\n",
+        "dic_vocabulary = vecto.vocabulary_"
+      ],
+      "metadata": {
+        "id": "ZvPyTANEQ5FD"
+      },
+      "execution_count": 33,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 34,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "NiOXVhjDjw49",
+        "outputId": "1e2908de-02af-4fca-9807-40a96a2292c7"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "The X_train shape-----> (40500, 4508)\n",
+            "The X_text shape------> (4500, 5000)\n",
+            "THe y_train shape-----> (40500,)\n",
+            "The y_test shape------> (4500,)\n"
+          ]
+        }
+      ],
+      "source": [
+        "print(\"The X_train shape----->\",X_train_2.shape)\n",
+        "print('The X_text shape------>',X_test.shape)\n",
+        "print(\"THe y_train shape----->\",y_train.shape)\n",
+        "print(\"The y_test shape------>\",y_test.shape)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 35,
+      "metadata": {
+        "id": "wXbnP6U1jzy0"
+      },
+      "outputs": [],
+      "source": [
+        "\n",
+        "def classifier_scores(y_train,y_test, pred_train, pred_test):\n",
+        "    \n",
+        "    print()\n",
+        "    print(\"Train data accuracy score: \", accuracy_score(y_train,pred_train))    \n",
+        "    print(\"Test data accuracy score: \", accuracy_score(y_test,pred_test))\n",
+        "    print()\n",
+        "    print(\"Recall score on train data: \", recall_score(y_train,pred_train, average='macro'))\n",
+        "    print(\"Recall score on test data: \",recall_score( y_test,pred_test, average='macro'))\n",
+        "    print()\n",
+        "    \n",
+        "    print(\"Precision score on train data: \",precision_score(y_train,pred_train, average='macro'))\n",
+        "    print(\"Precision score on test data: \",precision_score(y_test,pred_test, average='macro'))\n",
+        "    print()\n",
+        "    print(\"F1 score on train data: \",f1_score(y_train,pred_train, average='macro'))\n",
+        "    print(\"F1 score on test data: \",f1_score(y_test,pred_test, average='macro'))"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        ""
+      ],
+      "metadata": {
+        "id": "iwp9dKJmRtay"
+      },
+      "execution_count": 35,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Transform X_test to new dimension, as similar as X_train"
+      ],
+      "metadata": {
+        "id": "H5YkWun7RuWJ"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "X_test_transform = vecto_2.transform(corpus_test)\n",
+        "print('The X_text shape------>',X_test_transform.shape)\n"
+      ],
+      "metadata": {
+        "id": "d-y74i2xR2z4",
+        "outputId": "2a9ef8ec-7b33-4d29-a6ef-0647f98868eb",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 36,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "The X_text shape------> (4500, 4508)\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 37,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "pEDnYzSuj2j1",
+        "outputId": "f6819335-4a8a-4bf6-9fa2-e44b34e9a338"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Multinamial NB----------------------------------->\n",
+            "\n",
+            "Train data accuracy score:  0.7264691358024692\n",
+            "Test data accuracy score:  0.6348888888888888\n",
+            "\n",
+            "Recall score on train data:  0.7263553641849084\n",
+            "Recall score on test data:  0.6362781051932621\n",
+            "\n",
+            "Precision score on train data:  0.7264982900005854\n",
+            "Precision score on test data:  0.6352116747917347\n",
+            "\n",
+            "F1 score on train data:  0.7254845805122848\n",
+            "F1 score on test data:  0.6346862157412152\n"
+          ]
+        }
+      ],
+      "source": [
+        "## Multinomial Naive Bayes\n",
+        "print(\"Multinamial NB----------------------------------->\")\n",
+        "multinb = MultinomialNB()\n",
+        "multinb.fit(X_train_2, y_train)\n",
+        "\n",
+        "y_train_pred = multinb.predict(X_train_2)\n",
+        "y_test_pred = multinb.predict(X_test_transform)\n",
+        "classifier_scores(y_train,y_test,y_train_pred,y_test_pred)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "0gdAyo-0j96D"
+      },
+      "source": [
+        "## Predict process\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 38,
+      "metadata": {
+        "id": "swmpuFQLj--V"
+      },
+      "outputs": [],
+      "source": [
+        "new_doc = \"\"\"\n",
+        "\"Be confident in your heritage. Be confident in your blackness,\" President Barack Obama told graduates and their families at Howard University's 2016 Commencement Ceremony. It was one of many moments in a speech that honored the achievements of black folks — many Howard alumni — and called on graduates to get and stay politically active. His speech was met with laughter, generous applause, and largely positive reviews. Paul Holston, editor-in-chief of Howard's student newspaper The Hilltop, wrote that Obama's address was \"strong, eloquent, and inspirational,\" and would \"go down as one of the most significant moments in Howard University's history.\"\n",
+        "\n",
+        "Where Does The 'Pull Up Your Pants' School Of Black Politics Come From?\n",
+        "CODE SWITCH\n",
+        "Where Does The 'Pull Up Your Pants' School Of Black Politics Come From?\n",
+        "Howard students weren't the only ones cheering over the speech. Janell Ross at The Washington Post lauded Obama's call for \"empathy and [an] expanded moral imagination\" as one of the few surprising and thought-provoking messages that graduates will receive this season. On Twitter, Slate writer Jamelle Bouie called the speech \"a great mediation on democracy AND a celebration of black life.\" Mathew Rodriguez at Mic described Obama's speech as \"one of the best and blackest he's given.\"\n",
+        "\n",
+        "Melissa Harris-Perry, editor-at-large of Elle, wrote that Obama's speech was remarkable in its treatment of gender as well as race, and proved \"that he is our most black, feminist president to date\" by highlighting the genius of black women like Lorraine Hansberry, Harriet Tubman, Fannie Lou Hamer and Zora Neale Hurston:\n",
+        "\n",
+        "\"Once again, [Obama] put black women at the very center of the stories he told and the lessons he imparted. As he warmed up, he jokingly referred to 'Shonda Rhimes owning Thursday night' and 'Beyonce running the world.' They were casual references, not central themes of his talk, but even here he deployed two boss black women as representatives of black excellence and achievement.\"\n",
+        "\n",
+        "The tone surprised some African-Americans who had been critical of what they see as the president's habit of talking down to primarily black crowds. The last time Obama spoke at an HBCU's commencement was at Morehouse College in 2013, where he was criticized for promoting a finger-wagging brand of respectability politics with remarks like these:\n",
+        "\n",
+        "\"Just as Morehouse has taught you to expect more of yourselves, inspire those who look up to you to expect more of themselves. We know that too many young men in our community continue to make bad choices. And I have to say, growing up, I made quite a few myself. Sometimes I wrote off my own failings as just another example of the world trying to keep a black man down. I had a tendency sometimes to make excuses for me not doing the right thing. But one of the things that all of you have learned over the last four years is there's no longer any room for excuses.\"\n",
+        "\n",
+        "Ta-Nehisi Coates responded to that speech by calling out what he saw as the double standard Obama used in addressing African-Americans. In a piece called \"How the Obama Administration Talks to Black America,\" Coates wrote that the president acts like someone \"who sees holding African Americans to a standard of individual responsibility as part of his job. This is not a role Barack Obama undertakes with other communities.\"\n",
+        "\n",
+        "Some observers who were worried that the president might affect the same scolding posture at Howard were pleased, if not entirely won over. Michael P. Jeffries, over at The Boston Globe, said that the Howard speech was more earnest in its depiction of structural inequality:\n",
+        "\n",
+        "\"...noting that a black woman is only paid 66 cents for every $1 earned by an equally qualified white man, and that mass incarceration has exploded since [Obama's] college days. In one striking passage, he reminded the audience: 'We have cousins and uncles and brothers and sisters who we remember were just as smart and just as talented as we were, but somehow got ground down by structures that are unfair and unjust.' Rather than individual failings, Obama shifted responsibility away from black families and toward the institutions that produce black suffering.\"\n",
+        "\n",
+        "Still, Jeffries observes \"how much further [Obama] has to go\" to fairly depict race in America. In his speech, Obama praises Black Lives Matter activist Brittany Packnett as someone who broke with the orthodoxy of her movement to enact change. But, according to Jeffries:\n",
+        "\n",
+        "\"What Obama left out is that Packnett is not an anomaly among Black Lives Matter leadership. Protesters have interrupted campaign events for Hillary Clinton, Bernie Sanders, and Donald Trump, but activist DeRay McKesson certainly believes in voting: He ran for mayor of Baltimore. The Chicago-based Black Youth Project has protested mayor Rahm Emanuel and held rallies in the name of Rekia Boyd and other victims of police violence. The organization has also published research reports, and its directors have worked with several well established and likeminded groups, including the NAACP.\n",
+        "\n",
+        "So, in many respects, Black Lives Matter is already living out the charge put forth by the president.\"\n",
+        "\n",
+        "Clarence B. Jones, at HuffPost Black Voices, wrote that \"the content of what President Obama said, and the way in which he spoke it were engaging; at times, powerfully moving.\" But he agreed with Jeffries's sentiment that the president undersold the accomplishments of the BLM movement when he chastised young people for not turning out to vote in midterm elections:\n",
+        "\n",
+        "\"It is not enough to patronizingly lecture that 'the perfect' 'should not be the enemy of the good or the better.' He should have not just singled out Brittany Packnett, a leader in the Black Lives Matter Movement, for praise in meeting with him and other establishment political leaders. He should have said, flat out, like 'Straight Outta Compton,' that leaders of the Movement, like Dr. King earlier, had forced America's conscience to confront the reality of successive police shootings of black men, in several circumstances where the use of non-lethal force appeared to be an available option to effect an arrest.\n",
+        "\n",
+        "In effect, President Obama should have acknowledged that he AND ALL America owe a debt of gratitude to the courage and leadership of the Black Lives Matter movement in highlighting the apparent systemic racism in our criminal justice system when applied to African-Americans in several or our communities, nationwide.\"\n",
+        "\n",
+        "BLM activists themselves had some things to say about Obama's speech. DeRay McKesson tweeted his approval of the president's remarks, but also warned about oversimplifying the message:\n",
+        "\n",
+        "\"Obama's commencement speech at HowardU today was important, as we both reflected on the past in blackness and our future. Obama's speech was complicated, as he noted the role of compromise in the work of progress, while maintains a commitment to one's values. Obama also rightly noted that awareness is not the win, but is the initial work that creates space for later wins. [He] also noted the work of activists like [Brittany Packnett], noting that we will have to be intentional in how we change systems/structures. In many ways, this speech echoed themes he offered when [she and I] met with him a month ago. He is becoming more explicit re: discussing blackness.\"\n",
+        "\n",
+        "McKesson continued:\n",
+        "\n",
+        "\"We protest to change the world, not to continue protesting until the end of time. Awareness must lead to work focused on concrete solutions. Obama's focus on voting was not an indictment of the movement, of protest, or of organizing. Don't reduce his speech to this stale reading.\"\n",
+        "\n",
+        "Still, others weren't blown away by the speech. Maya Rhodan at Time magazine described Obama's Howard speech as another replica from the \"mold he often leans on in remarks to black audiences.\" She offered up the president's time-tested speech recipe: \"a nod to our nation's racial history, a pit-stop on his presidency, and a call to pay it forward.\"\n",
+        "\n",
+        "In Commencement Speech, Obama Advises Howard University Grads On Creating Change\n",
+        "THE TWO-WAY\n",
+        "In Commencement Speech, Obama Advises Howard University Grads On Creating Change\n",
+        "Over at The Guardian, Steven W. Thrasher reflected that \"part of Obama's genius as our first black president is that he can provoke so many responses...even in the course of a single speech.\" But that genius is complicated. Thrasher was inspired by Obama's address until \"respectability politics started to creep in,\" and the president began urging the crowd to empathize with \"the refugee, the immigrant, the rural poor, the transgender person and yes, the middle-aged white guy who you may think has all the advantages, but over the last several decades has seen his world upended by economic and cultural and technological change and feels powerless to stop it.\" Here's more from Thrasher:\n",
+        "\n",
+        "\"Why did the nation's first black president feel the need to equate the transgender person who can't use the bathroom in North Carolina, and the unfairly maligned immigrant with that 'middle-aged white guy'?\n",
+        "\n",
+        "Who feels so threatened by the 'cultural' change of living under a black president and living under conditions a little more like those black Americans have endured for hundreds of years that he's likely voting for Donald Trump?\n",
+        "\n",
+        "Who isn't losing all of his white privilege, because he still has a black president telling black grads to get in his head?\n",
+        "\"\"\""
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 39,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "Q3bPqFA6kCOv",
+        "outputId": "1c4a3059-de40-47a3-fa7d-8dac9bfefd11"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :BLACK VOICES\n"
+          ]
+        }
+      ],
+      "source": [
+        "doc_list = []\n",
+        "doc_list.append(new_doc)\n",
+        "doc_test = vecto_2.transform(doc_list)\n",
+        "return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 39,
+      "metadata": {
+        "id": "HuDO6B25DNW1"
+      },
+      "outputs": [],
+      "source": [
+        "f="
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount('/content/drive')"
+      ],
+      "metadata": {
+        "id": "YG5h-in6JHGz",
+        "outputId": "9179c951-9bb1-471b-b4c5-078477aa9d5f",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 41,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Drive already mounted at /content/drive; to attempt to forcibly remount, call drive.mount(\"/content/drive\", force_remount=True).\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        ""
+      ],
+      "metadata": {
+        "id": "95K46OoaP0XI"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        ""
+      ],
+      "metadata": {
+        "id": "-7TeHDmFP3Dr"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "f=open(\"/content/drive/MyDrive/data/Business/1.txt\",\"r\")\n",
+        "d=f.read()\n",
+        "doc_test = vecto_2.transform([d])\n",
+        "return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction\n"
+      ],
+      "metadata": {
+        "id": "UN4IgukKJtq_",
+        "outputId": "5b9a35bb-5aa5-430b-d66d-2696a31438b3",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 44,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :BUSINESS\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "f=open(\"/content/drive/MyDrive/data/Business/2.txt\",\"r\")\n",
+        "d=f.read()\n",
+        "doc_test = vecto_2.transform([d])\n",
+        "return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction"
+      ],
+      "metadata": {
+        "id": "qRDEOUaeLGZw",
+        "outputId": "14d55ba7-7211-40ce-d43d-53efd6a0c595",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 45,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :BUSINESS\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "f=open(\"/content/drive/MyDrive/data/Business/31.txt\",\"r\")\n",
+        "d=f.read()\n",
+        "doc_test = vecto_2.transform([d])\n",
+        "return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction"
+      ],
+      "metadata": {
+        "id": "MwqEdTFTLTmq",
+        "outputId": "4e4da367-f205-4333-8248-b8dacc4b8d8d",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 46,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :BUSINESS\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "f=open(\"/content/drive/MyDrive/data/Business/1.txt\",\"r\")\n",
+        "d=f.read()\n",
+        "doc_test = vecto_2.transform([d])\n",
+        "return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction"
+      ],
+      "metadata": {
+        "id": "usb5mchrLZqx"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pathlib\n",
+        "count=0\n",
+        "for path in pathlib.Path(\"/content/drive/MyDrive/data/Entertainment\").iterdir():\n",
+        "    if path.is_file():\n",
+        "        current_file = open(path, \"r\")\n",
+        "        d=current_file.read()\n",
+        "        doc_test = vecto_2.transform([d])\n",
+        "        return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "        print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction\n",
+        "        if label.inverse_transform(return_pred)[0]==\"ENTERTAINMENT\":\n",
+        "          count+=1\n",
+        "       \n",
+        "        current_file.close()\n",
+        "print(count)\n",
+        "        "
+      ],
+      "metadata": {
+        "id": "Oax3vmT_Lji5",
+        "outputId": "29221735-6642-462a-8e63-5a8dfe336054",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 54,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :POLITICS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :POLITICS\n",
+            " The event category is :PARENTING\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :SPORTS\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :POLITICS\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :SPORTS\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :COMEDY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :SPORTS\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :COMEDY\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            "27\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pathlib\n",
+        "count=0\n",
+        "for path in pathlib.Path(\"/content/drive/MyDrive/data/Business\").iterdir():\n",
+        "    if path.is_file():\n",
+        "        current_file = open(path, \"r\")\n",
+        "        d=current_file.read()\n",
+        "        doc_test = vecto_2.transform([d])\n",
+        "        return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "        print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction\n",
+        "        if label.inverse_transform(return_pred)[0]==\"BUSINESS\":\n",
+        "          count+=1\n",
+        "       \n",
+        "        current_file.close()\n",
+        "print(count)"
+      ],
+      "metadata": {
+        "id": "mnW67hs7OCxx",
+        "outputId": "e77e23ce-54ff-4212-cba0-b005ffa4269d",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 55,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :POLITICS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :BUSINESS\n",
+            "31\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        ""
+      ],
+      "metadata": {
+        "id": "5XN8ldhnOX1C"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pathlib\n",
+        "count=0\n",
+        "for path in pathlib.Path(\"/content/drive/MyDrive/data/Queer Voices\").iterdir():\n",
+        "    if path.is_file():\n",
+        "        current_file = open(path, \"r\")\n",
+        "        d=current_file.read()\n",
+        "        doc_test = vecto_2.transform([d])\n",
+        "        return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "        print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction\n",
+        "        if label.inverse_transform(return_pred)[0]==\"QUEER VOICES\":\n",
+        "          count+=1\n",
+        "       \n",
+        "        current_file.close()\n",
+        "print(count)"
+      ],
+      "metadata": {
+        "id": "ihNRqjogLwol",
+        "outputId": "18d02d6a-3d87-4a13-e19b-74369108e0b3",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 56,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :BUSINESS\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :PARENTS\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :PARENTS\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :QUEER VOICES\n",
+            "30\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pathlib\n",
+        "count=0\n",
+        "for path in pathlib.Path(\"/content/drive/MyDrive/data/Wellness\").iterdir():\n",
+        "    if path.is_file():\n",
+        "        current_file = open(path, \"r\")\n",
+        "        d=current_file.read()\n",
+        "        doc_test = vecto_2.transform([d])\n",
+        "        return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "        print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction\n",
+        "        if label.inverse_transform(return_pred)[0]==\"WELLNESS\":\n",
+        "          count+=1\n",
+        "       \n",
+        "        current_file.close()\n",
+        "print(count)"
+      ],
+      "metadata": {
+        "id": "vUfJ3y7KOy9K",
+        "outputId": "de865e3d-8e5e-473d-99e4-a7b5d0bde335",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 59,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :QUEER VOICES\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :WELLNESS\n",
+            "22\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pathlib\n",
+        "count=0\n",
+        "for path in pathlib.Path(\"/content/drive/MyDrive/data/comedy\").iterdir():\n",
+        "    if path.is_file():\n",
+        "        current_file = open(path, \"r\")\n",
+        "        d=current_file.read()\n",
+        "        doc_test = vecto_2.transform([d])\n",
+        "        return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "        print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction\n",
+        "        if label.inverse_transform(return_pred)[0]==\"COMEDY\":\n",
+        "          count+=1\n",
+        "       \n",
+        "        current_file.close()\n",
+        "print(count)"
+      ],
+      "metadata": {
+        "id": "DpTIWcWlQZVa",
+        "outputId": "dd3c93d0-2e23-4bc6-ca56-82149fab665c",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 61,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :SPORTS\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :COMEDY\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :COMEDY\n",
+            " The event category is :COMEDY\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :COMEDY\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :COMEDY\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :COMEDY\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :COMEDY\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :COMEDY\n",
+            "8\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pathlib\n",
+        "count=0\n",
+        "for path in pathlib.Path(\"/content/drive/MyDrive/data/politics\").iterdir():\n",
+        "    if path.is_file():\n",
+        "        current_file = open(path, \"r\")\n",
+        "        d=current_file.read()\n",
+        "        doc_test = vecto_2.transform([d])\n",
+        "        return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "        print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction\n",
+        "        if label.inverse_transform(return_pred)[0]==\"POLITICS\":\n",
+        "          count+=1\n",
+        "       \n",
+        "        current_file.close()\n",
+        "print(count)"
+      ],
+      "metadata": {
+        "id": "_azs_-abRF-O",
+        "outputId": "e2d23452-9ec1-4b89-ffa5-80cbb29ae2d9",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 64,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :PARENTS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            " The event category is :POLITICS\n",
+            "41\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pathlib\n",
+        "count=0\n",
+        "for path in pathlib.Path(\"/content/drive/MyDrive/data/sports\").iterdir():\n",
+        "    if path.is_file():\n",
+        "        current_file = open(path, \"r\")\n",
+        "        d=current_file.read()\n",
+        "        doc_test = vecto_2.transform([d])\n",
+        "        return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "        print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction\n",
+        "        if label.inverse_transform(return_pred)[0]==\"SPORTS\":\n",
+        "          count+=1\n",
+        "       \n",
+        "        current_file.close()\n",
+        "print(count)"
+      ],
+      "metadata": {
+        "id": "VIvQVX0GRRdH",
+        "outputId": "15eb5b36-0934-4f25-ef88-2ac2abcf1d8c",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 65,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :HOME & LIVING\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :SPORTS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :SPORTS\n",
+            "47\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pathlib\n",
+        "count=0\n",
+        "for path in pathlib.Path(\"/content/drive/MyDrive/data/style & beauty\").iterdir():\n",
+        "    if path.is_file():\n",
+        "        current_file = open(path, \"r\")\n",
+        "        d=current_file.read()\n",
+        "        doc_test = vecto_2.transform([d])\n",
+        "        return_pred = multinb.predict(doc_test)\n",
+        "\n",
+        "        print(' The event category is :' + label.inverse_transform(return_pred)[0]) #### Result of the prediction\n",
+        "        if label.inverse_transform(return_pred)[0]==\"STYLE & BEAUTY\":\n",
+        "          count+=1\n",
+        "       \n",
+        "        current_file.close()\n",
+        "print(count)"
+      ],
+      "metadata": {
+        "id": "vQD1cqgZRbma",
+        "outputId": "3996e654-d593-4b65-c6a8-8fedc6380fa9",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": 66,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :HOME & LIVING\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :POLITICS\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :HEALTHY LIVING\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :POLITICS\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :QUEER VOICES\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :ENTERTAINMENT\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :WELLNESS\n",
+            " The event category is :BUSINESS\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :TRAVEL\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :BLACK VOICES\n",
+            " The event category is :STYLE & BEAUTY\n",
+            " The event category is :SPORTS\n",
+            " The event category is :BUSINESS\n",
+            "26\n"
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "colab": {
+      "collapsed_sections": [],
+      "name": "AAI Event Extraction",
+      "provenance": [],
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "display_name": "Python 3",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.10.3"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}
