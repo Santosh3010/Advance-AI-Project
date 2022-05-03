@@ -6,12 +6,14 @@
     - Three important components are : category, headline, short description
 AAI_Event_Extraction.ipynb:
     - This is the first model of the paper. The paper is in notebook and result is showned automatically
+Improved KNWGRAPH:
+    - Implementation of the Knowledge Graph model.
 
 distantSearch.py 
-- Provide example of distant supervision
-- to compile
-- python distantSearch.py csv_file folder_name
-- python distantSearch.py currency.csv currency
+- Provide example of distant supervision, the dataset of this program is in datasets/distant/
+- to compile :
+    - python distantSearch.py csv_file folder_name
+    - python distantSearch.py currency.csv currency
 
 relation_examples.py
 - A short example on how to extract relation using first order logic
