@@ -1,7 +1,8 @@
 # Advance-AI-Project
+to install all requirements run in cmd:
+pip install -r requirements.txt
 
-
-./datasets
+./datasets 
 - Contains json files with objects relate to news
     - Three important components are : category, headline, short description
 AAI_Event_Extraction.ipynb:
